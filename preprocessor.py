@@ -14,7 +14,13 @@ def read_dataset(directory):
   return dataset
   
 
-def divide_song(song):
+def next_batch(dataset, index, batch_size):
+  for song in dataset:
+    if index < len(song):
+      break
+    else:
+      index -= len(song)
+    index -= 
   return False
   #TODO How should I do this?
   #One bar at a time?
