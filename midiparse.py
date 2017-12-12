@@ -57,7 +57,19 @@ def readfile_midi(filename):
       song.append([0]*88)
       song[len(song)-1][event.data[0]-21] = 1
 
+  trim(song)
   return song
+
+def trim(song):
+  for i in song:
+    if i == [0]*88:
+      song.pop(0)
+
+  for i in reverse(song):
+    if i == [0]*88:
+      song.pop()
+    else:
+      break
 
 def print_song(song):
   for frame in song:
