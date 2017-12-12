@@ -1,22 +1,22 @@
+from __future__ import print_function
 import music21
 import midi
 
-EMPTY_FRAME = [0]*88
-
+"""
 #TODO DELETEME
 def readfile(filename):
   score = music21.converter.parse(filename, format="midi")
   #This needs to be more dimensions
   l = []
  
-  time_sig = score.getTimeSignatures().timeSignature.
+  time_sig = score.getTimeSignatures().timeSignature
   bar_duration = time_sig.barDuration
 
   score = score.quantize((16,))#Quantize to sixteenth
   
   beat = 1
   for note in score.recurse().notesAndRests:
-    if beat >= 5
+    if beat >= 5:
     if note.beat != beat:
       l.append(EMPTY_FRAME)
       continue
@@ -30,14 +30,14 @@ def readfile(filename):
 
   #For time note.beat might be useful, but what to do about outliers.
   #In elise it's mostly divisible by 1/2, but some are 11/6 and so on.
+"""
 
-#TODO Needs testing
 #Does not use music21. Also way faster
 def readfile_midi(filename):
   pattern = midi.read_midifile(filename)
   pattern.make_ticks_abs()
   pattern.sort()
-  filter_notes()
+  filter_notes(pattern)
 
   time_sig = []
 
@@ -47,17 +47,23 @@ def readfile_midi(filename):
   time = 0
   song = []
   for event in pattern[0]:
-    if event.tick != time:
-      for i in range(time, event.tick, delta):#Fix time
-        time += (event.tick - time) / delta
-        song.append(EMPTY_FRAME)
+    if event.tick > time:
+      for i in range(time, event.tick, time_delta):#Fix time
+        #time += (event.tick - time) / time_delta
+        time += time_delta
+        song.append([0]*88)
       
-      if event.data[1] != 0:
-        song.append(EMPTY_FRAME)
-        song[len(song)-1][event.data[0]-21] = 1
+    if event.data[1] != 0:
+      song.append([0]*88)
+      song[len(song)-1][event.data[0]-21] = 1
 
   return song
 
+def print_song(song):
+  for frame in song:
+    for note in frame:
+      print(note, end="")
+    print("")
 
 #Untested
 def quantize(pattern, delta):
@@ -70,12 +76,18 @@ def quantize(pattern, delta):
 
 #Untested
 def filter_notes(pattern):
- for i in range(len(pattern[0])):
-   if type(pattern[0][i]) != midi.NoteOnEvent:
-     pattern[0].pop(i)
+  i = 0
+ 
+  #for i in range(len(pattern[0])):
+  while i < len(pattern[0]):
+    if type(pattern[0][i]) != midi.NoteOnEvent:
+      pattern[0].pop(i)
+      i -= 1
+    i += 1
 
+#TODO DELETEME
 def get_notes(note):
-  frame = EMPTY_FRAME
+  frame = [0]*88
   if note.isChord:
     for pitch in note.pitches:
       frame[pitch.midi-21] = 1
