@@ -1,36 +1,5 @@
 from __future__ import print_function
-import music21
 import midi
-
-"""
-#TODO DELETEME
-def readfile(filename):
-  score = music21.converter.parse(filename, format="midi")
-  #This needs to be more dimensions
-  l = []
- 
-  time_sig = score.getTimeSignatures().timeSignature
-  bar_duration = time_sig.barDuration
-
-  score = score.quantize((16,))#Quantize to sixteenth
-  
-  beat = 1
-  for note in score.recurse().notesAndRests:
-    if beat >= 5:
-    if note.beat != beat:
-      l.append(EMPTY_FRAME)
-      continue
-    else:
-      l.append(get_notes(note))
-
-    beat += 0.25#I think TODO Be more sure
-
-    #TODO For time. Quantisize by 16th notes. probably. I think
-    #REAd here: https://keunwoochoi.wordpress.com/2016/02/23/lstmetallica/
-
-  #For time note.beat might be useful, but what to do about outliers.
-  #In elise it's mostly divisible by 1/2, but some are 11/6 and so on.
-"""
 
 #Does not use music21. Also way faster
 def readfile_midi(filename):
@@ -64,8 +33,10 @@ def trim(song):
   for i in song:
     if i == [0]*88:
       song.pop(0)
+    else:
+      break
 
-  for i in reverse(song):
+  for i in reversed(song):
     if i == [0]*88:
       song.pop()
     else:
