@@ -3,6 +3,8 @@ import numpy as np
 from keras.models import Sequential
 from keras.layers import Conv2D, Conv2DTranspose, Activation, Dense, Flatten
 
+import preprocessor
+
 def step(x):
   return 0 if x < 0 else 1
 
@@ -10,18 +12,23 @@ class Model:
   def __init__(self):
     self.discriminator = self.create_discriminator()
     #self.generator = self.create_generator()
-    self.train([], 10)
-
+    data = preprocessor.read_dataset("./data")
+    self.train(data, 10)
 
   def train(self, dataset, batch_size):
+    dataset_length = dataset.shape[3]
     #positives = self.generator.fit()
-    positives = self.noise(batch_size)
-    negatives = self.noise(batch_size)#TODO FIXME Replace with training data
+    real_songs = dataset
+    #gen_songs  = self.generator.predict(self.noise(dataset_length))#TODO Uncomment
+    gen_songs = self.noise(dataset_length)
     #TODO Shuffle?
-    x = np.concatenate((positives, negatives), axis=0)
-    y = np.concatenate(([[1, 0]]*batch_size, [[0, 1]]*batch_size), axis=0)
-    
-    self.discriminator.fit(x, y)
+    print(gen_songs.shape)
+    x = np.concatenate((gen_songs, real_songs), axis=3)
+    y = np.concatenate(([[1, 0]]*dataset_length, [[0, 1]]*dataset_length), axis=0)#[1, 0] -> computer, [0, 1] -> human
+    perm = np.random.permutation(len(x))
+    x = x[perm]
+    y = y[perm]
+    self.discriminator.fit(x, y, batch_size=2*batch_size)
     predictions = self.discriminator.predict(x)
     print(predictions)
 
@@ -68,4 +75,3 @@ class Model:
 
   def noise(self, n):
     return np.random.random((n, 88, 64, 1))
-
