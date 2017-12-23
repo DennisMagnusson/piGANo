@@ -1,7 +1,7 @@
 import numpy as np
 
 from keras.models import Sequential
-from keras.layers import Conv2D, Conv2DTranspose, Activation, Dense, Flatten
+from keras.layers import Conv2D, Conv2DTranspose, Activation, Dense, Flatten, Dropout
 
 import preprocessor
 
@@ -9,18 +9,18 @@ class Model:
   def __init__(self):
     self.discriminator = self.create_discriminator()
     self.generator = self.create_generator()
-    data = preprocessor.read_dataset("./data")
+    data = preprocessor.read_dataset("./data", length=20)
     self.train(data, 10)
 
   def train(self, dataset, batch_size):
-    dataset_length = dataset.shape[3]
+    dataset_length = dataset.shape[0]
     real_songs = dataset
-    gen_songs  = self.round(self.generator.predict(self.noise(dataset_length)))
+    gen_songs  = self.round(self.generator.predict(self.noise(dataset_length, self.generator.input_shape)))
     print(gen_songs.shape)
     print(real_songs.shape)
     #gen_songs = self.noise(dataset_length)
-    #print(gen_songs.shape)
-    x = np.concatenate((gen_songs, real_songs), axis=3)
+    print(gen_songs.shape)
+    x = np.concatenate((gen_songs, real_songs), axis=0)
     y = np.concatenate(([[1, 0]]*dataset_length, [[0, 1]]*dataset_length), axis=0)#[1, 0] -> computer, [0, 1] -> human
     perm = np.random.permutation(len(x))
     x = x[perm]
@@ -35,12 +35,15 @@ class Model:
   def create_discriminator(self):
     model = Sequential([
       Conv2D(10, (12, 4), input_shape=(88, 64, 1)),
+      Dropout(0.3),
       Activation('relu'),
-      Conv2D(20, (32, 32)),
+      Conv2D(20, (12, 16)),
+      Dropout(0.3),
       Activation('relu'),
       Flatten(),
       Dense(20),
       Activation('linear'),
+      Dropout(0.3),
       Dense(2),
       Activation('softmax')
     ])
@@ -50,12 +53,12 @@ class Model:
     return model
     
   def create_generator(self):
-    model = Sequential([
-      Conv2DTranspose(1, (8, 8), input_shape=(88, 64, 1)),#FIXME dims seem to reduce with 7 for every layer.
+    model = Sequential([#TODO Add batch norm
+      Conv2DTranspose(20, (12, 16), input_shape=(66, 46, 20)),#FIXME dims seem to reduce with 7 for every layer.
       Activation('relu'),
-      Conv2DTranspose(1, (8, 8)),
+      Conv2DTranspose(10, (12, 4)),
       Activation('relu'),
-      Conv2DTranspose(1, (8, 8)),
+      Conv2DTranspose(1, (1, 1)),#Good enough
       Activation('sigmoid')
     ])
 
@@ -75,5 +78,5 @@ class Model:
     self.generator.predict()
 
 
-  def noise(self, n):
-    return np.random.random((n, 88, 64, 1))
+  def noise(self, n, shape):
+    return np.random.random((n,) + shape[1:])

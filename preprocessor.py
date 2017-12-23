@@ -1,18 +1,38 @@
 from os import listdir
 from os.path import isfile
 
+import numpy as np
+
 import midiparse
 
-def read_dataset(directory):
-  files = list(filter(lambda f: isFile(f), listdir(directory)))
-
+def read_dataset(directory, length=-1):
+  files = list(filter(lambda f: not isfile(f), listdir(directory)))
+  
   print(files)#Test
   
-  songs = [midiparse.readfile_midi(f) for f in files]
-  dataset = [divide_song(song) for song in songs]
+  songs = [midiparse.readfile_midi("data/"+f) for f in files]
+  dataset = []
+  for song in songs:
+    for div in divide_song(song, 64):
+      dataset.append(div)
+  
+  if length != -1:
+    dataset = dataset[:length]
 
+  dataset = np.array(dataset)
+  l = dataset.shape[0]
+  dataset = dataset.reshape(l, 64, 88, 1).swapaxes(1,2)
+  print(dataset.shape)
   return dataset
   
+#TODO Test
+#TODO What to do with the last part?
+def divide_song(song, sequence_len):
+  s = []
+  for i in range(0, len(song)-sequence_len, sequence_len):
+    s.append(song[i:i+sequence_len])
+
+  return s
 
 def next_batch(dataset, index, batch_size):
   for song in dataset:
@@ -20,7 +40,7 @@ def next_batch(dataset, index, batch_size):
       break
     else:
       index -= len(song)
-    index -= 
+    index -= 1
   return False
   #TODO How should I do this?
   #One bar at a time?

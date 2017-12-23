@@ -6,7 +6,7 @@ def readfile_midi(filename):
   pattern = midi.read_midifile(filename)
   pattern.make_ticks_abs()
   pattern.sort()
-  filter_notes(pattern)
+  pattern = [list(filter(lambda x: type(x) == midi.NoteOnEvent, p)) for p in pattern]
 
   time_sig = []
 
@@ -15,17 +15,25 @@ def readfile_midi(filename):
   
   time = 0
   song = []
-  for event in pattern[0]:
-    if event.tick > time:
-      for i in range(time, event.tick, time_delta):#Fix time
-        #time += (event.tick - time) / time_delta
-        time += time_delta
-        song.append([0]*88)
-      
-    if event.data[1] != 0:
-      song.append([0]*88)
-      song[len(song)-1][event.data[0]-21] = 1
+  for q in range(len(pattern)):
+    if len(pattern[q]) < 20:#The lazy way
+      continue
 
+    for event in pattern[q]:
+      if event.tick > time:
+        for i in range(time, event.tick, time_delta):#Fix time
+          #time += (event.tick - time) / time_delta
+          time += time_delta
+          song.append([0]*88)
+
+      if len(event.data) < 2:
+        print(event)
+        continue
+        
+      if event.data[1] != 0:
+        song.append([0]*88)
+        song[len(song)-1][event.data[0]-21] = 1
+  
   trim(song)
   return song
 
@@ -56,26 +64,4 @@ def quantize(pattern, delta):
           event.tick -= event.tick / delta
         else:
           event.tick += delta - event.tick / delta
-
-#Untested
-def filter_notes(pattern):
-  i = 0
- 
-  #for i in range(len(pattern[0])):
-  while i < len(pattern[0]):
-    if type(pattern[0][i]) != midi.NoteOnEvent:
-      pattern[0].pop(i)
-      i -= 1
-    i += 1
-
-#TODO DELETEME
-def get_notes(note):
-  frame = [0]*88
-  if note.isChord:
-    for pitch in note.pitches:
-      frame[pitch.midi-21] = 1
-  elif note.isNote:
-    frame[note.pitch.midi-21] = 1
-
-  return frame
 
