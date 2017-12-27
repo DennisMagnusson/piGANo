@@ -22,7 +22,6 @@ def read_dataset(directory, length=-1):
   dataset = np.array(dataset)
   l = dataset.shape[0]
   dataset = dataset.reshape(l, 64, 88, 1).swapaxes(1,2)
-  print(dataset.shape)
   return dataset
   
 #TODO Test
