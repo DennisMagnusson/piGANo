@@ -13,16 +13,13 @@ datasetino = []
 class GAN:
   def __init__(self):
     global datasetino
-    optimizer = RMSprop(0.001)
-    self.D = self.create_discriminator()
-    self.D.compile(loss='binary_crossentropy', optimizer=optimizer)
+    self.D = self.create_discriminator([(12, 12), (6, 6), (4, 4)], [1, 5, 10], dropout=0.6)
+    self.D.compile(loss='binary_crossentropy', optimizer=RMSprop(0.001))
     self.D.summary()
-    self.G = self.create_generator()
+    self.G = self.create_generator([(12, 12), (12, 12), (12, 12)], [50, 25, 1])
     self.G.compile(loss='binary_crossentropy', optimizer=RMSprop(0.005))
     self.G.summary()
-    #inp = Input(shape=(31, 15, 10,))
-    inp = Input(shape=(55, 31, 50))
-    #Model(inp, self.D(self.G(inp)))
+    inp = Input(shape=self.input_shape)
 
     self.D.trainable = False
     self.GAN = Model(inp, self.D(self.G(inp)))
@@ -33,8 +30,9 @@ class GAN:
  
     batch_size=60
 
-    self.pre_train(data[:300], batch_size, epochs=20)
-    self.train(data[300:], batch_size, epochs=20)
+    print("pre-training")
+    self.pre_train(data[:2000], batch_size, epochs=10)
+    self.train(data[2000:], batch_size, epochs=20)
 
   def train(self, dataset, batch_size, epochs=1):
     print(dataset.shape)
@@ -106,7 +104,20 @@ class GAN:
         print(s, end="")
       print("")
 
-  def create_discriminator(self):
+  def create_discriminator(self, filter_sizes, n_filters, dropout=0.6):
+    model = Sequential()
+    model.add(Conv2D(n_filters[1], filter_sizes[1], input_shape=(88, 64, 1)))
+
+    for i in range(1, len(filter_sizes)):
+      model.add(Conv2D(n_filters[i], filter_sizes[i]))
+      model.add(Dropout(dropout))
+      model.add(Activation('relu'))
+
+    model.add(Flatten())
+    model.add(Dropout(dropout))
+    model.add(Dense(1))
+    model.add(Activation('sigmoid'))
+    """
     model = Sequential([
       Conv2D(1, (12, 4), input_shape=(88, 64, 1)),
       Dropout(0.6),
@@ -116,33 +127,30 @@ class GAN:
       Dense(1),
       Activation('sigmoid')
     ])
+    """
 
-    #inp = Input(shape=(88, 64, 1))
     return model
     
-  def create_generator(self):
-    """
-    model = Sequential([#TODO Add batch norm
-      Conv2DTranspose(10, (12, 4), input_shape=(31, 15, 10)),#FIXME dims seem to reduce with n-1 for every layer.
-      Activation('linear'),
-      BatchNormalization(),
-      Conv2DTranspose(5, (12, 16)),
-      Activation('linear'),
-      BatchNormalization(),
-      Conv2DTranspose(1, (24, 32)),#Good enough
-      Activation('sigmoid')
-    ])
-    """
-    model = Sequential([#TODO Add batch norm
-      Conv2DTranspose(50, (12, 12), input_shape=(55, 31, 50)),#FIXME dims seem to reduce with n-1 for every layer.
-      Activation('linear'),
-      BatchNormalization(),
-      Conv2DTranspose(25, (12, 12)),
-      Activation('linear'),
-      BatchNormalization(),
-      Conv2DTranspose(1, (12, 12)),#Good enough
-      Activation('sigmoid')
-    ])
+  def create_generator(self, filter_sizes, n_filters):
+    input_dim1 = 88
+    input_dim2 = 64
+    input_dim3 = n_filters[0]
+    for s in filter_sizes:
+      input_dim1 -= s[0]-1
+      input_dim2 -= s[1]-1
+
+    self.input_shape = (input_dim1, input_dim2, input_dim3)
+
+    model = Sequential()
+    model.add(Conv2DTranspose(n_filters[0], filter_sizes[0], input_shape=self.input_shape))
+    model.add(Activation("linear"))
+    model.add(BatchNormalization())
+    for i in range(1, len(filter_sizes)-1):
+      model.add(Conv2DTranspose(n_filters[i], filter_sizes[i]))
+      model.add(Activation("linear"))
+      model.add(BatchNormalization())
+    model.add(Conv2DTranspose(1, (filter_sizes[len(filter_sizes)-1])))
+    model.add(Activation('sigmoid'))
 
     return model
 
