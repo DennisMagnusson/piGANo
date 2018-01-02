@@ -8,8 +8,6 @@ import midiparse
 def read_dataset(directory, length=-1):
   files = list(filter(lambda f: not isfile(f), listdir(directory)))
   
-  print(files)#Test
-  
   songs = [midiparse.readfile_midi("data/"+f) for f in files]
   dataset = []
   for song in songs:
