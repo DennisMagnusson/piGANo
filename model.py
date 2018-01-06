@@ -2,8 +2,11 @@ from __future__ import print_function
 
 import numpy as np
 
+import plaidml.keras
+plaidml.keras.install_backend()
+
 from keras.models import Sequential, Model
-from keras.layers import Conv2D, Conv2DTranspose, Activation, Dense, Flatten, Dropout, Input, BatchNormalization
+from keras.layers import Conv2D, Conv2DTranspose, Activation, Dense, Flatten, Dropout, Input, BatchNormalization, UpSampling2D, Reshape
 from keras.optimizers import Adam, RMSprop
 
 import preprocessor
@@ -17,9 +20,9 @@ class GAN:
     self.D.compile(loss='binary_crossentropy', optimizer=RMSprop(0.001))
     self.D.summary()
     self.G = self.create_generator([(12, 12), (12, 12), (12, 12)], [50, 25, 1])
-    self.G.compile(loss='binary_crossentropy', optimizer=RMSprop(0.005))
+    self.G.compile(loss='binary_crossentropy', optimizer=RMSprop(0.0005))
     self.G.summary()
-    inp = Input(shape=self.input_shape)
+    inp = Input(shape=self.input_shape[1:])
 
     self.D.trainable = False
     self.GAN = Model(inp, self.D(self.G(inp)))
@@ -28,20 +31,17 @@ class GAN:
     data = preprocessor.read_dataset("./data", length=-1)
     datasetino = data
  
-    batch_size=60
+    batch_size = 250
 
     print("pre-training")
-    self.pre_train(data[:2000], batch_size, epochs=10)
-    self.train(data[2000:], batch_size, epochs=20)
+    self.pre_train(data[:3000], batch_size, epochs=2)
+    self.train(data[3000:], batch_size, epochs=20)
 
   def train(self, dataset, batch_size, epochs=1):
     print(dataset.shape)
     dataset_length = dataset.shape[0]
     print(batch_size, dataset_length)
     real_songs = dataset
-
-    #input_shape = (batch_size, 31, 15, 10)#TODO Do this better
-    input_shape=(batch_size, 55, 31, 50)
 
     for e in range(epochs):
       G_loss = 0
@@ -51,7 +51,7 @@ class GAN:
       other_predictions = []
       gen_songs = []
       for i in range(0, dataset_length-batch_size, batch_size):
-        noise = self.noise(batch_size, input_shape)
+        noise = self.noise(batch_size, self.input_shape)
         gen_songs  = self.round(self.G.predict(noise))#Generate songs
         predictions = self.D.predict(gen_songs)
         other_predictions = self.D.predict(dataset[i:i+batch_size])
@@ -60,7 +60,7 @@ class GAN:
         D_loss += self.D.train_on_batch(dataset[i:i+batch_size], np.ones((batch_size, 1)))
 
         GAN_loss += self.GAN.train_on_batch(noise, predictions)
-      
+     
       self.print_song(gen_songs[0])
       print("********************")
       print(predictions[0:5])
@@ -80,16 +80,17 @@ class GAN:
   #Give the generator a head start.
   def pre_train(self, dataset, batch_size, epochs=1):
     dataset_length = dataset.shape[0]
-    #input_shape = (batch_size, 31, 15, 10)#TODO Do this better
-    input_shape=(batch_size, 55, 31, 50)
 
     for e in range(epochs):
       loss = 0
+      prev = 0
       for i in range(0, dataset_length-batch_size, batch_size):
-        loss = self.G.train_on_batch(self.noise(batch_size, input_shape), dataset[i:i+batch_size])
+        prev = loss
+        loss = self.G.train_on_batch(self.noise(batch_size, self.input_shape), dataset[i:i+batch_size])
+        print(loss, i, "/", dataset_length, "delta:", loss-prev, end="\r")
     
       print("Last loss= ", loss)
-    song = self.G.predict(self.noise(1, input_shape))
+    song = self.G.predict(self.noise(1, self.input_shape))
     self.print_raw_song(song[0])
 
   #XXX this prints sideways.
@@ -117,21 +118,25 @@ class GAN:
     model.add(Dropout(dropout))
     model.add(Dense(1))
     model.add(Activation('sigmoid'))
-    """
-    model = Sequential([
-      Conv2D(1, (12, 4), input_shape=(88, 64, 1)),
-      Dropout(0.6),
-      Activation('linear'),
-      Flatten(),
-      Dropout(0.6),
-      Dense(1),
-      Activation('sigmoid')
-    ])
-    """
 
     return model
     
   def create_generator(self, filter_sizes, n_filters):
+    model = Sequential()
+    self.input_shape=(1, 100)
+    model.add(Dense(22*16*100, input_shape=self.input_shape[1:]))
+    model.add(Reshape((22, 16, 100)))
+    #model.add(UpSampling2D((2, 2), input_shape=self.input_shape[1:]))
+    model.add(UpSampling2D((2, 2)))
+    model.add(Conv2D(50, (12, 12), padding='same'))
+    model.add(Activation('relu'))
+    model.add(UpSampling2D((2, 2)))
+    model.add(Conv2D(25, (4, 4), padding='same'))
+    model.add(Activation('relu'))
+    model.add(Conv2D(1, (1, 1), padding='same'))
+    model.add(Activation('sigmoid'))
+
+    """
     input_dim1 = 88
     input_dim2 = 64
     input_dim3 = n_filters[0]
@@ -151,9 +156,11 @@ class GAN:
       model.add(BatchNormalization())
     model.add(Conv2DTranspose(1, (filter_sizes[len(filter_sizes)-1])))
     model.add(Activation('sigmoid'))
+    """
 
     return model
 
+  #TODO Replace with sample of some sort?
   def round(self, x):
     return np.where(x < 0.5, 0, 1)
 
@@ -169,3 +176,18 @@ class GAN:
       for i in range(song.shape[0]):#88
         print(int(song[i][frame]), end="")
       print()
+
+
+"""
+ f = ('function (I[{input_dims_str}], K[{ker_dims_str}]) ' + '-> (O) {{\n{padding_str}\n' +
+         '  O[{out_idx_str} : {out_dims_str}] = +(I[{input_idx_str}]*K[{ker_idx_str}]);\n}}')
+            .format(**{
+             'input_dims_str': input_dims_str,
+             'ker_dims_str': ker_dims_str,
+             'out_idx_str': out_idx_str,
+             'out_dims_str': out_dims_str,
+             'input_idx_str': input_idx_str,
+             'ker_idx_str': ker_idx_str,
+             'padding_str': padding_str
+})
+"""
