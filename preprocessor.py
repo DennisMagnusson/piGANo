@@ -9,7 +9,6 @@ def read_dataset(directory, length=-1):
   files = list(filter(lambda f: not isfile(f), listdir(directory)))
   songs = []
   for f in files:
-    print(len(songs))
     if length != -1 and len(songs)*10 > length:#Just an estimation
       break
     songs.append(midiparse.readfile_midi("data/"+f))
