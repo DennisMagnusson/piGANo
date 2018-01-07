@@ -27,15 +27,14 @@ class GAN:
     self.D.trainable = False
     self.GAN = Model(inp, self.D(self.G(inp)))
     self.GAN.compile(loss="binary_crossentropy", optimizer=RMSprop(0.1))
-    
+
+  def run(self):
     data = preprocessor.read_dataset("./data", length=-1)
     datasetino = data
- 
-    batch_size = 250
-
+    batch_size = 10
     print("pre-training")
-    self.pre_train(data[:3000], batch_size, epochs=2)
-    self.train(data[3000:], batch_size, epochs=20)
+    self.pre_train(data[:1000], batch_size, epochs=2)
+    self.train(data[1000:], batch_size, epochs=20)
 
   def train(self, dataset, batch_size, epochs=1):
     print(dataset.shape)
@@ -44,38 +43,47 @@ class GAN:
     real_songs = dataset
 
     for e in range(epochs):
-      G_loss = 0
-      D_loss = 0
-      GAN_loss = 0
+      total_G_loss = 0
+      total_D_loss = 0
+      total_GAN_loss = 0
       predictions = []
       other_predictions = []
       gen_songs = []
       for i in range(0, dataset_length-batch_size, batch_size):
         noise = self.noise(batch_size, self.input_shape)
-        gen_songs  = self.round(self.G.predict(noise))#Generate songs
+        gen_songs = self.G.predict(noise)#Generate songs
+        gen_songs = self.round(gen_songs)
         predictions = self.D.predict(gen_songs)
         other_predictions = self.D.predict(dataset[i:i+batch_size])
 
-        G_loss += self.D.train_on_batch(gen_songs, np.zeros((batch_size, 1)))
-        D_loss += self.D.train_on_batch(dataset[i:i+batch_size], np.ones((batch_size, 1)))
+        G_loss = self.D.train_on_batch(gen_songs, np.zeros((batch_size, 1)))
+        D_loss = self.D.train_on_batch(dataset[i:i+batch_size], np.ones((batch_size, 1)))
 
-        GAN_loss += self.GAN.train_on_batch(noise, predictions)
+        GAN_loss = self.GAN.train_on_batch(noise, predictions)
+
+        total_G_loss += G_loss
+        total_D_loss += D_loss
+        total_GAN_loss += GAN_loss
+
+        if i % 1500 == 0:
+          self.print_raw_song(gen_songs[0])
+
+        print("{}/{} G_loss={}, D_loss={}, GAN_loss={}".format(i, dataset_length, G_loss, D_loss, GAN_loss), end='\r')
      
-      self.print_song(gen_songs[0])
       print("********************")
       print(predictions[0:5])
       print(other_predictions[10:15])
       print(e)
       iterations = dataset_length / batch_size
-      D_loss /= iterations
-      G_loss /= iterations
-      print(D_loss, G_loss)
-      GAN_loss /= iterations
-      D_loss = 1.0/2*(D_loss+G_loss)
-      G_loss = 1-G_loss
-      print("G_loss= ", G_loss)
-      print("D_loss= ", D_loss)
-      print("GAN_loss= ", GAN_loss)
+      total_D_loss /= iterations
+      total_G_loss /= iterations
+      print(total_D_loss, total_G_loss)
+      total_GAN_loss /= iterations
+      total_D_loss = 1.0/2*(total_D_loss+total_G_loss)
+      total_G_loss = 1-G_loss
+      print("G_loss= ", total_G_loss)
+      print("D_loss= ", total_D_loss)
+      print("GAN_loss= ", total_GAN_loss)
 
   #Give the generator a head start.
   def pre_train(self, dataset, batch_size, epochs=1):
@@ -162,7 +170,7 @@ class GAN:
 
   #TODO Replace with sample of some sort?
   def round(self, x):
-    return np.where(x < 0.5, 0, 1)
+    return np.where(x < 0.2, 0, 1)
 
   def generate(self):
     songs = self.G.predict(noise(batch_size))
