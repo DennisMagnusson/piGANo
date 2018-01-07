@@ -31,12 +31,12 @@ def divide_song(song, sequence_len):
   s = []
   i = 0
   while i < len(song)-sequence_len:
+    s.append(song[i:i+sequence_len])
+    i += sequence_len
     while True:
       if np.all(song[i]==0):
         i += 1
       else:
         break
-    s.append(song[i:i+sequence_len])
-    i += sequence_len
 
   return s
