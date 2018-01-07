@@ -56,7 +56,7 @@ class GAN:
         predictions = self.D.predict(gen_songs)
         other_predictions = self.D.predict(dataset[i:i+batch_size])
 
-        G_loss = self.D.train_on_batch(gen_songs, np.zeros((batch_size, 1)))
+        G_loss = 1-self.D.train_on_batch(gen_songs, np.zeros((batch_size, 1)))
         D_loss = self.D.train_on_batch(dataset[i:i+batch_size], np.ones((batch_size, 1)))
 
         GAN_loss = self.GAN.train_on_batch(noise, predictions)
@@ -79,8 +79,8 @@ class GAN:
       total_G_loss /= iterations
       print(total_D_loss, total_G_loss)
       total_GAN_loss /= iterations
-      total_D_loss = 1.0/2*(total_D_loss+total_G_loss)
-      total_G_loss = 1-G_loss
+      total_D_loss = 1.0/2*(total_D_loss+(1-total_G_loss))
+      total_G_loss = G_loss
       print("G_loss= ", total_G_loss)
       print("D_loss= ", total_D_loss)
       print("GAN_loss= ", total_GAN_loss)
