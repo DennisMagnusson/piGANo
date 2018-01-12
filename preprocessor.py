@@ -5,14 +5,17 @@ import numpy as np
 
 import midiparse
 
-def read_dataset(directory, length=-1):
-  files = list(filter(lambda f: not isfile(f), listdir(directory)))
+def read_dataset(directory, length=-1, filename=""):
   songs = []
-  for f in files:
-    if length != -1 and len(songs)*10 > length:#Just an estimation
-      break
-    songs.append(midiparse.readfile_midi("data/"+f))
-  #songs = [midiparse.readfile_midi("data/"+f) for f in files]
+  if filename != "":
+    songs.append(midiparse.readfile_midi(filename))
+  else:
+    files = list(filter(lambda f: not isfile(f), listdir(directory)))
+    for f in files:
+      if length != -1 and len(songs)*10 > length:#Just an estimation
+        break
+      songs.append(midiparse.readfile_midi("data/"+f))
+
   dataset = []
   for song in songs:
     if length != -1 and len(dataset) > length:
