@@ -6,7 +6,7 @@ import plaidml.keras
 plaidml.keras.install_backend()
 
 from keras.models import Sequential, Model
-from keras.layers import Conv2D, Conv2DTranspose, Activation, Dense, Flatten, Dropout, Input, BatchNormalization, UpSampling2D, Reshape
+from keras.layers import Conv2D, Conv2DTranspose, Activation, Dense, Flatten, Dropout, Input, BatchNormalization, UpSampling2D, Reshape, AveragePooling2D
 from keras.optimizers import Adam, RMSprop
 
 import matplotlib.pyplot as plt
@@ -36,11 +36,11 @@ class GAN:
     data = preprocessor.read_dataset("./data", length=-1)
     datasetino = data
     #data = mnist.load_data()[0][0].reshape(60000, 28, 28, 1)
-    batch_size = 16
+    batch_size = 8
     print("pre-training")
-    self.pre_train(data[:100], batch_size, epochs=1)#Overfitting this bad boy
+    self.pre_train(data[:1000], batch_size, epochs=1)#TODO Overfit more?
     print("pre-training done")
-    self.train(data[100:], batch_size, epochs=20)
+    self.train(data[1000:], batch_size, epochs=20)
 
   def plot_gen(self, n_ex=16,dim=(4,4), figsize=(10,10) ):
     noise = self.noise(1, self.input_shape)
@@ -178,6 +178,7 @@ class GAN:
       model.add(Dropout(dropout))
       model.add(Activation('relu'))
 
+    model.add(AveragePooling2D(1, 2))
     model.add(Flatten())
     model.add(Dropout(dropout))
     model.add(Dense(1))
@@ -189,7 +190,9 @@ class GAN:
   def create_generator(self, filter_sizes, n_filters):
     model = Sequential()
     self.input_shape=(1, n_filters[0])
-    model.add(Dense(22*16*10, input_shape=self.input_shape[1:]))
+    model.add(Dropout(0.5, input_shape=self.input_shape[1:]))#TODO Is this good?
+    model.add(Dense(22*16*10))
+    #model.add(Dense(22*16*10, input_shape=self.input_shape[1:]))
     model.add(Activation('relu'))
     model.add(BatchNormalization())
     model.add(Reshape((22, 16, 10)))
