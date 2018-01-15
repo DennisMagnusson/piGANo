@@ -9,8 +9,7 @@ from keras.models import Sequential, Model
 from keras.layers import Conv2D, Conv2DTranspose, Activation, Dense, Flatten, Dropout, Input, BatchNormalization, UpSampling2D, Reshape
 from keras.optimizers import Adam, RMSprop
 
-#TODO DELETEME
-from keras.datasets import mnist
+import matplotlib.pyplot as plt
 
 import preprocessor
 
@@ -19,11 +18,12 @@ datasetino = []
 class GAN:
   def __init__(self):
     global datasetino
-    self.D = self.create_discriminator([(2, 2), (2, 2), (2, 2)], [1, 5, 10], dropout=0.7)
+    self.D = self.create_discriminator([(12, 16), (7, 1)], [64, 128], dropout=0.3)
     self.D.compile(loss='binary_crossentropy', optimizer=Adam(0.0001))
     self.D.summary()
-    self.G = self.create_generator([(5, 5), (5, 5), (5, 5)], [200, 100, 50, 1])
-    self.G.compile(loss='binary_crossentropy', optimizer=Adam(0.001))
+
+    self.G = self.create_generator([(12, 12), (7, 7)], [10, 64])
+    self.G.compile(loss='binary_crossentropy', optimizer=Adam(0.01))
     self.G.summary()
     inp = Input(shape=self.input_shape[1:])
 
@@ -33,15 +33,35 @@ class GAN:
     self.GAN.compile(loss="binary_crossentropy", optimizer=Adam(0.001))
 
   def run(self):
-    #data = preprocessor.read_dataset("./data", length=-1)
-    #data = preprocessor.read_dataset("./data", length=1000)
-    #datasetino = data
-    data = mnist.load_data()[0][0].reshape(60000, 28, 28, 1)
-    batch_size = 50
+    data = preprocessor.read_dataset("./data", length=-1)
+    datasetino = data
+    #data = mnist.load_data()[0][0].reshape(60000, 28, 28, 1)
+    batch_size = 16
     print("pre-training")
-    #self.pre_train(data[:1000], batch_size, epochs=5)#Overfitting this bad boy
-    self.pre_train(data[:1000], batch_size, epochs=5)#Overfitting this bad boy
+    self.pre_train(data[:100], batch_size, epochs=1)#Overfitting this bad boy
+    print("pre-training done")
     self.train(data[100:], batch_size, epochs=20)
+
+  def plot_gen(self, n_ex=16,dim=(4,4), figsize=(10,10) ):
+    noise = self.noise(1, self.input_shape)
+    generated_images = self.G.predict(noise)
+
+    plt.figure(figsize=figsize)
+    for i in range(generated_images.shape[0]):
+        plt.subplot(dim[0],dim[1],i+1)
+        img = generated_images[i,0,:,:]
+        plt.imshow(img)
+        plt.axis('off')
+    plt.tight_layout()
+    plt.show(block=False)
+
+  def print_greyscale(self, pixels, width=64, height=88):
+    pixels = pixels.reshape(88, 64)
+    for row in pixels:
+      for pixel in row:
+        color = 232 + round(pixel*23)
+        print('\x1b[48;5;{}m \x1b[0m'.format(int(color)), end="")
+      print()
 
   def train(self, dataset, batch_size, epochs=1):
     print(dataset.shape)
@@ -59,27 +79,31 @@ class GAN:
       for i in range(0, dataset_length-batch_size, batch_size):
         noise = self.noise(batch_size, self.input_shape)
         gen_songs = self.G.predict(noise)#Generate songs
-        #gen_songs = self.round(gen_songs) #TODO Uncomment?
         predictions = self.D.predict(gen_songs)
         other_predictions = self.D.predict(dataset[i:i+batch_size])
 
         G_loss = 1-self.D.train_on_batch(gen_songs, np.zeros((batch_size, 1)))
         D_loss = self.D.train_on_batch(dataset[i:i+batch_size], np.ones((batch_size, 1)))
 
-        #GAN_loss = self.GAN.train_on_batch(noise, predictions)
+        #noise = self.noise(batch_size, self.input_shape)#Fresh new noise
         GAN_loss = self.GAN.train_on_batch(noise, np.ones((batch_size, 1)))
 
         total_G_loss += G_loss
         total_D_loss += D_loss
         total_GAN_loss += GAN_loss
 
-        if i % 1500 == 0:
-          print()
+        if i % 2000 == 0:
+          print(i)
           self.print_raw_song(gen_songs[0])
+          self.print_greyscale(gen_songs[0])
 
         print("{}/{} G_loss={}, D_loss={}, GAN_loss={}".format(i, dataset_length, G_loss, D_loss, GAN_loss), end='\r')
      
       print("********************")
+      gen_songs = self.G.predict(self.noise(1, self.input_shape))
+      self.print_greyscale(gen_songs[0])
+      self.print_raw_song(gen_songs[0])
+
       print(predictions[0:5])
       print(other_predictions[10:15])
       print(e)
@@ -113,12 +137,8 @@ class GAN:
 
         x = np.concatenate((dataset[i:i+batch_size], gen_songs))
         y = np.concatenate((np.ones((batch_size, 1)),  np.zeros((batch_size, 1))))
-        self.D.fit(x, y, shuffle=True, verbose=0)
-        d_loss = 0
-        #TODO This is not training
-        #TODO Probably just trips to one value. Shuffle?
-        #d_loss = 0.5*self.D.train_on_batch(dataset[i:i+batch_size], np.ones((batch_size, 1)))
-        #d_loss+= 0.5*self.D.train_on_batch(gen_songs, np.zeros((batch_size, 1)))
+        h = self.D.fit(x, y, shuffle=True, verbose=0, epochs=2)
+        d_loss = h.history['loss'][1]
 
         print(loss, i, "/", dataset_length, "d_loss:", d_loss, end="\r")
 
@@ -142,16 +162,16 @@ class GAN:
       for note in range(len(part)):
         s = "%.1f"%part[note]
         if s.endswith("0"):
-          s = s[0]+'  '
+          s = s[0]+' '
         else:
-          s = s[1:]+' '
+          s = s[1:]+''
         print(s, end="")
       print("")
 
   def create_discriminator(self, filter_sizes, n_filters, dropout=0.6):
     model = Sequential()
-    #model.add(Conv2D(n_filters[1], filter_sizes[1], input_shape=(88, 64, 1)))
-    model.add(Conv2D(n_filters[1], filter_sizes[1], input_shape=(28, 28, 1), padding='same'))
+    model.add(Conv2D(n_filters[0], filter_sizes[0], input_shape=(88, 64, 1), padding='same'))
+    #model.add(Conv2D(n_filters[1], filter_sizes[1], input_shape=(28, 28, 1), padding='same'))
 
     for i in range(1, len(filter_sizes)):
       model.add(Conv2D(n_filters[i], filter_sizes[i], padding='same'))
@@ -164,48 +184,23 @@ class GAN:
     model.add(Activation('sigmoid'))
 
     return model
-    
-  #TODO You can't even overfit this piece of shit.
+  
+  #TODO make the arguments work properly
   def create_generator(self, filter_sizes, n_filters):
     model = Sequential()
     self.input_shape=(1, n_filters[0])
-    #model.add(Dense(22*16*100, input_shape=self.input_shape[1:]))#TODO Uncomment
-    model.add(Dense(7*7*n_filters[0], input_shape=self.input_shape[1:]))#TODO Remove
+    model.add(Dense(22*16*10, input_shape=self.input_shape[1:]))
+    model.add(Activation('relu'))
     model.add(BatchNormalization())
-    #model.add(Reshape((22, 16, 100)))#TODO Uncomment
-    model.add(Reshape((7, 7, n_filters[0])))#TODO Remove
-    #model.add(UpSampling2D((2, 2), input_shape=self.input_shape[1:]))
+    model.add(Reshape((22, 16, 10)))
     model.add(UpSampling2D((4, 4)))
-    model.add(Conv2D(n_filters[1], (3, 3), padding='same'))
-    model.add(BatchNormalization())
-    model.add(Activation('sigmoid'))
-    model.add(Conv2D(n_filters[2], (3, 3), padding='same'))
-    model.add(BatchNormalization())
-    model.add(Activation('sigmoid'))
+    for i in range(1, len(filter_sizes)):
+      model.add(Conv2D(n_filters[i], filter_sizes[i], padding='same'))
+      model.add(BatchNormalization())
+      model.add(Activation('relu'))
+
     model.add(Conv2D(1, (1, 1), padding='same'))
     model.add(Activation('sigmoid'))
-
-    """
-    input_dim1 = 88
-    input_dim2 = 64
-    input_dim3 = n_filters[0]
-    for s in filter_sizes:
-      input_dim1 -= s[0]-1
-      input_dim2 -= s[1]-1
-
-    self.input_shape = (input_dim1, input_dim2, input_dim3)
-
-    model = Sequential()
-    model.add(Conv2DTranspose(n_filters[0], filter_sizes[0], input_shape=self.input_shape))
-    model.add(Activation("linear"))
-    model.add(BatchNormalization())
-    for i in range(1, len(filter_sizes)-1):
-      model.add(Conv2DTranspose(n_filters[i], filter_sizes[i]))
-      model.add(Activation("linear"))
-      model.add(BatchNormalization())
-    model.add(Conv2DTranspose(1, (filter_sizes[len(filter_sizes)-1])))
-    model.add(Activation('sigmoid'))
-    """
 
     return model
 
@@ -225,18 +220,3 @@ class GAN:
       for i in range(song.shape[0]):#88
         print(int(song[i][frame]), end="")
       print()
-
-
-"""
- f = ('function (I[{input_dims_str}], K[{ker_dims_str}]) ' + '-> (O) {{\n{padding_str}\n' +
-         '  O[{out_idx_str} : {out_dims_str}] = +(I[{input_idx_str}]*K[{ker_idx_str}]);\n}}')
-            .format(**{
-             'input_dims_str': input_dims_str,
-             'ker_dims_str': ker_dims_str,
-             'out_idx_str': out_idx_str,
-             'out_dims_str': out_dims_str,
-             'input_idx_str': input_idx_str,
-             'ker_idx_str': ker_idx_str,
-             'padding_str': padding_str
-})
-"""
