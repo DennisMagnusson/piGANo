@@ -17,31 +17,44 @@ def readfile_midi(filename):
 
   time_sig = []
 
-  time_delta = 480/4 #Don't ask why.
-  quantize(pattern, time_delta)
+  delta = 480/8#Don't ask why.
+  quantize(pattern, delta)
   
   time = 0
   song = []
-  for q in range(len(pattern)):
-    if len(pattern[q]) < 20:#The lazy way
+
+  maxtick = 0
+  
+  print(len(pattern))
+  print(len(pattern[0]))
+  print(type(pattern[0][0]))
+
+
+  for track in pattern:
+    if len(track) < 20:
       continue
 
-    for event in pattern[q]:
-      if event.tick > time:
-        for i in range(time, event.tick, time_delta):#Fix time
-          time += time_delta
-          song.append(np.zeros(88, dtype='uint8'))
+    if track[len(track)-1].tick > maxtick:
+      maxtick = track[len(track)-1].tick
 
-      if len(event.data) < 2:
-        print(event)
+  for _ in range(0, maxtick, delta):
+    song.append(np.zeros(88, dtype='uint8'))
+
+  for track in pattern:
+    if len(track) < 20:
+      continue
+
+    for event in track:
+      if event.data[1] == 0:
         continue
-        
-      if event.data[1] != 0:
-        song.append(np.zeros(88, dtype='uint8'))
-        if event.data[0] < 21 or event.data[0] >= 88+21:
-          print(filename, "has note #", event.data[0]-21)
-          return []
-        song[len(song)-1][event.data[0]-21] = 1
+
+      note = event.data[0] - 21
+      if note < 0 or note >= 88:
+        print(filename, "has note #", event.data[0]-21)
+        return []
+
+      t = event.tick/delta
+      song[t][note] = 1
   
   trim(song)
   return song
@@ -65,12 +78,11 @@ def print_song(song):
       print(note, end="")
     print("")
 
-#Untested
 def quantize(pattern, delta):
   for event in pattern[0]:
       if event.tick % delta != 0:
         if event.tick % delta < delta/2:
-          event.tick -= event.tick / delta
+          event.tick -= event.tick % delta
         else:
-          event.tick += delta - event.tick / delta
+          event.tick += delta - (event.tick % delta)
 
