@@ -3,7 +3,7 @@ import midi
 
 
 def write_midi(pattern, filename):
-  delta = 480/4
+  delta = 480/8
 
   track0 = midi.Track([
     midi.SmpteOffsetEvent(tick=0, data=[96, 0, 3, 0, 0]),
