@@ -24,11 +24,6 @@ def readfile_midi(filename):
   song = []
 
   maxtick = 0
-  
-  print(len(pattern))
-  print(len(pattern[0]))
-  print(type(pattern[0][0]))
-
 
   for track in pattern:
     if len(track) < 20:
@@ -37,7 +32,7 @@ def readfile_midi(filename):
     if track[len(track)-1].tick > maxtick:
       maxtick = track[len(track)-1].tick
 
-  for _ in range(0, maxtick, delta):
+  for _ in range(0, maxtick+1, delta):
     song.append(np.zeros(88, dtype='uint8'))
 
   for track in pattern:
