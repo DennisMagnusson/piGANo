@@ -7,11 +7,13 @@ plaidml.keras.install_backend()
 
 from keras.models import Sequential, Model
 from keras.layers import Conv2D, Conv2DTranspose, Activation, Dense, Flatten, Dropout, Input, BatchNormalization, UpSampling2D, Reshape, AveragePooling2D
+from keras.layers.advanced_activations import LeakyReLU
 from keras.optimizers import Adam, RMSprop
 
 import matplotlib.pyplot as plt
 
 import preprocessor
+import midiwrite
 
 datasetino = []
 
@@ -27,20 +29,9 @@ class GAN:
     self.G.summary()
     inp = Input(shape=self.input_shape[1:])
 
-    #self.D.trainable = False
     self.set_d_trainable(False)
     self.GAN = Model(inp, self.D(self.G(inp)))
     self.GAN.compile(loss="binary_crossentropy", optimizer=Adam(0.001))
-
-  def run(self):
-    data = preprocessor.read_dataset("./data", length=-1)
-    datasetino = data
-    #data = mnist.load_data()[0][0].reshape(60000, 28, 28, 1)
-    batch_size = 8
-    print("pre-training")
-    self.pre_train(data[:1000], batch_size, epochs=1)#TODO Overfit more?
-    print("pre-training done")
-    self.train(data[1000:], batch_size, epochs=20)
 
   def plot_gen(self, n_ex=16,dim=(4,4), figsize=(10,10) ):
     noise = self.noise(1, self.input_shape)
@@ -96,6 +87,11 @@ class GAN:
           print(i)
           self.print_raw_song(gen_songs[0])
           self.print_greyscale(gen_songs[0])
+
+        if i == 10000:
+          self.print_greyscale(gen_songs[0])
+          self.print_greyscale(self.round(gen_songs[0]))
+          midiwrite.write_midi(self.round(gen_songs[0]).tolist(), "test.mid")
 
         print("{}/{} G_loss={}, D_loss={}, GAN_loss={}".format(i, dataset_length, G_loss, D_loss, GAN_loss), end='\r')
      
@@ -171,11 +167,15 @@ class GAN:
   def create_discriminator(self, filter_sizes, n_filters, dropout=0.6):
     model = Sequential()
     model.add(Conv2D(n_filters[0], filter_sizes[0], input_shape=(88, 64, 1), padding='same'))
+    model.add(Dropout(dropout))
+    #model.add(LeakyReLU(0.2))
+    model.add(Activation('relu'))
     #model.add(Conv2D(n_filters[1], filter_sizes[1], input_shape=(28, 28, 1), padding='same'))
 
     for i in range(1, len(filter_sizes)):
       model.add(Conv2D(n_filters[i], filter_sizes[i], padding='same'))
       model.add(Dropout(dropout))
+      #model.add(LeakyReLU(0.2))
       model.add(Activation('relu'))
 
     model.add(AveragePooling2D(1, 2))
@@ -194,12 +194,14 @@ class GAN:
     model.add(Dense(22*16*10))
     #model.add(Dense(22*16*10, input_shape=self.input_shape[1:]))
     model.add(Activation('relu'))
+    #model.add(LeakyReLU(0.2))
     model.add(BatchNormalization())
     model.add(Reshape((22, 16, 10)))
     model.add(UpSampling2D((4, 4)))
     for i in range(1, len(filter_sizes)):
       model.add(Conv2D(n_filters[i], filter_sizes[i], padding='same'))
       model.add(BatchNormalization())
+      #model.add(LeakyReLU(0.2))
       model.add(Activation('relu'))
 
     model.add(Conv2D(1, (1, 1), padding='same'))
@@ -209,7 +211,7 @@ class GAN:
 
   #TODO Replace with sample of some sort?
   def round(self, x):
-    return np.where(x < 0.2, 0, 1)
+    return np.where(x < 0.7, 0, 1)
 
   def generate(self):
     songs = self.G.predict(noise(batch_size))
