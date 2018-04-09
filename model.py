@@ -85,12 +85,12 @@ class GAN:
 
         if i % 2000 == 0:
           print(i)
-          self.print_raw_song(gen_songs[0])
-          self.print_greyscale(gen_songs[0])
+          song.print_raw_song(gen_songs[0])
+          song.print_grayscale(gen_songs[0])
 
         if i == 10000:
-          self.print_greyscale(gen_songs[0])
-          self.print_greyscale(self.round(gen_songs[0]))
+          self.print_grayscale(gen_songs[0])
+          song.print_greyscale(self.round(gen_songs[0]))
           midiwrite.write_midi(self.round(gen_songs[0]).tolist(), "test.mid")
 
         print("{}/{} G_loss={}, D_loss={}, GAN_loss={}".format(i, dataset_length, G_loss, D_loss, GAN_loss), end='\r')
@@ -98,7 +98,7 @@ class GAN:
       print("********************")
       gen_songs = self.G.predict(self.noise(1, self.input_shape))
       self.print_greyscale(gen_songs[0])
-      self.print_raw_song(gen_songs[0])
+      song.print_raw_song(gen_songs[0])
 
       print(predictions[0:5])
       print(other_predictions[10:15])
@@ -143,7 +143,7 @@ class GAN:
         break
       print("Avg loss= ", sum_loss)
     song = self.G.predict(self.noise(1, self.input_shape))
-    self.print_raw_song(song[0])
+    song.print_raw_song(song[0])
     #self.D.trainable = False
     self.set_d_trainable(False)
 
@@ -152,18 +152,6 @@ class GAN:
     for layer in self.D.layers:
       layer.trainable = t
   
-  #XXX this prints sideways.
-  def print_raw_song(self, song):
-    for part in song:
-      for note in range(len(part)):
-        s = "%.1f"%part[note]
-        if s.endswith("0"):
-          s = s[0]+' '
-        else:
-          s = s[1:]+''
-        print(s, end="")
-      print("")
-
   def create_discriminator(self, filter_sizes, n_filters, dropout=0.6):
     model = Sequential()
     model.add(Conv2D(n_filters[0], filter_sizes[0], input_shape=(88, 64, 1), padding='same'))
@@ -220,8 +208,3 @@ class GAN:
   def noise(self, n, shape):
     return np.random.random((n,) + shape[1:])
 
-  def print_song(self, song):
-    for frame in range(song.shape[1]):#64
-      for i in range(song.shape[0]):#88
-        print(int(song[i][frame]), end="")
-      print()
