@@ -2,8 +2,8 @@ from __future__ import print_function
 
 import numpy as np
 
-import plaidml.keras
-plaidml.keras.install_backend()
+#import plaidml.keras
+#plaidml.keras.install_backend()
 
 from keras.models import Sequential, Model
 from keras.layers import Conv2D, Conv2DTranspose, Activation, Dense, Flatten, Dropout, Input, BatchNormalization, UpSampling2D, Reshape, AveragePooling2D
@@ -166,7 +166,7 @@ class GAN:
       #model.add(LeakyReLU(0.2))
       model.add(Activation('relu'))
 
-    model.add(AveragePooling2D(1, 2))
+    #model.add(AveragePooling2D(1, 2))#TODO Doesn't work with this
     model.add(Flatten())
     model.add(Dropout(dropout))
     model.add(Dense(1))
