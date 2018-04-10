@@ -142,8 +142,8 @@ class GAN:
       if sum_loss < 0.02:
         break
       print("Avg loss= ", sum_loss)
-    song = self.G.predict(self.noise(1, self.input_shape))
-    song.print_raw_song(song[0])
+    gen_song = self.G.predict(self.noise(1, self.input_shape))
+    song.print_raw_song(gen_song[0])
     #self.D.trainable = False
     self.set_d_trainable(False)
 
