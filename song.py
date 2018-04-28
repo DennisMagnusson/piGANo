@@ -9,7 +9,7 @@ def print_song(song):
 def print_grayscale(song):
   for frame in song:
     for note in frame:
-      color = 232 + round(pixel*23)
+      color = 232 + round(note*23)
       print('\x1b[48;5;{}m \x1b[0m'.format(int(color)), end="")
     print()
 
