@@ -17,7 +17,8 @@ def print_grayscale(song):
 def print_raw_song(song):
   for frame in song.T:
     for note in frame:
-      s = "{:2.1f}".format(note)#TODO Clean this up
+      #s = "{:2.1f}".format(note)#TODO Clean this up
+      s = "{:2.1}".format(note)#TODO Clean this up
       if s.endswith("0"):
         s = s[0]+' '
       else:
