@@ -89,10 +89,10 @@ class GAN:
           song.print_raw_song(gen_songs[0])
           song.print_grayscale(gen_songs[0])
 
-        if i == 10000:
-          self.print_grayscale(gen_songs[0])
-          song.print_greyscale(self.round(gen_songs[0]))
-          midiwrite.write_midi(self.round(gen_songs[0]).tolist(), "test.mid")
+        #if i == 10000:
+          #song.print_grayscale(gen_songs[0])
+          #song.print_greyscale(self.round(gen_songs[0]))
+          #midiwrite.write_midi(self.round(gen_songs[0]).tolist(), "test.mid")
 
         print("{}/{} G_loss={}, D_loss={}, GAN_loss={}".format(i, dataset_length, G_loss, D_loss, GAN_loss), end='\r')
      
