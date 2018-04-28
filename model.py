@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 
 import preprocessor
 import midiwrite
+import song
 
 datasetino = []
 

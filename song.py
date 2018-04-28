@@ -1,3 +1,4 @@
+from __future__ import print_function
 
 def print_song(song):
   for frame in range(song.shape[1]):
