@@ -31,6 +31,7 @@ def write_midi(pattern, filename):
 
   m.append(midi.EndOfTrackEvent(tick=time+1, data=[]))
   m = midi.Track(m)
+  m.sort()
 
   pattern = midi.Pattern(tracks=[track0, m], tick_relative=False)
   pattern[1].tick_relative = False

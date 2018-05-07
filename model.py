@@ -214,5 +214,5 @@ class GAN:
     return songs
 
   def noise(self, n, shape):
-    return np.random.normal((n,) + shape[1:])
+    return np.random.normal(0.0, 1.0, (n,) + shape[1:])
 
