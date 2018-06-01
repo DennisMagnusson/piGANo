@@ -162,7 +162,7 @@ class GAN:
   def create_discriminator(self, filter_sizes, n_filters, dropout=0.6):
     model = Sequential()
     model.add(Conv2D(n_filters[0], filter_sizes[0], input_shape=(88, 64, 1), padding='same'))
-    model.add(AveragePooling2D(pool_size=(2, 2)))#TODO Remove?
+    #model.add(AveragePooling2D(pool_size=(2, 2)))#TODO Remove?
     model.add(Dropout(dropout))
     model.add(LeakyReLU(0.2))
     #model.add(Conv2D(n_filters[1], filter_sizes[1], input_shape=(28, 28, 1), padding='same'))
