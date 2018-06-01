@@ -21,11 +21,11 @@ datasetino = []
 class GAN:
   def __init__(self):
     global datasetino
-    self.D = self.create_discriminator([(12, 8), (7, 1)], [32, 64], dropout=0.3)
+    self.D = self.create_discriminator([(12, 8), (7, 5), (4, 4)], [32, 64, 64], dropout=0.3)
     self.D.compile(loss='binary_crossentropy', optimizer=Adam(0.0001))
     self.D.summary()
 
-    self.G = self.create_generator([(12, 12), (7, 7)], [64, 100])
+    self.G = self.create_generator([(12, 12), (7, 7), (2, 2)], [64, 100, 100])
     self.G.compile(loss='binary_crossentropy', optimizer=Adam(0.001))
     self.G.summary()
     inp = Input(shape=self.input_shape[1:])
@@ -34,7 +34,7 @@ class GAN:
     self.GAN = Model(inp, self.D(self.G(inp)))
     self.GAN.compile(loss="binary_crossentropy", optimizer=Adam(0.001))
 
-  def plot_gen(self, n_ex=16,dim=(4,4), figsize=(10,10) ):
+  def plot_gen(self, n_ex=16, dim=(4,4), figsize=(10,10)):
     noise = self.noise(1, self.input_shape)
     generated_images = self.G.predict(noise)
 
