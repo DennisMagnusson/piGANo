@@ -1,19 +1,25 @@
 from __future__ import print_function
-import midi
+import mydy as midi
+from mydy.FileIO import read_midifile
 
 import numpy as np
 
 #Does not use music21. Also way faster
 def readfile_midi(filename):
   try:
-    pattern = midi.read_midifile(filename)
+    pattern = read_midifile(filename)
   except Warning:
     print("Issue with", filename)
     return []
+  except TypeError:
+    print("error with", filename)
+    return []
+  
+  for i in range(len(pattern)):
+    pattern[i] = pattern[i].make_ticks_abs()
 
-  pattern.make_ticks_abs()
   pattern.sort()
-  pattern = [list(filter(lambda x: type(x) == midi.NoteOnEvent, p)) for p in pattern]
+  pattern = [list(filter(lambda x: type(x) == midi.Events.NoteOnEvent, p)) for p in pattern]
 
   time_sig = []
 
@@ -28,16 +34,18 @@ def readfile_midi(filename):
   for track in pattern:
     if len(track) < 20:
       continue
-
+    
     if track[len(track)-1].tick > maxtick:
       maxtick = track[len(track)-1].tick
-
-  for _ in range(0, maxtick+1, delta):
+ 
+  for _ in range(0, int(maxtick+delta), int(delta)):
     song.append(np.zeros(88, dtype='uint8'))
 
   for track in pattern:
     if len(track) < 20:
       continue
+
+    track.sort()
 
     for event in track:
       if event.data[1] == 0:
@@ -48,7 +56,7 @@ def readfile_midi(filename):
         print(filename, "has note #", event.data[0]-21)
         return []
 
-      t = event.tick/delta
+      t = int(event.tick/delta)
       song[t][note] = 1
   
   trim(song)

@@ -2,13 +2,8 @@ from __future__ import print_function
 
 import numpy as np
 
-#import plaidml.keras
-#plaidml.keras.install_backend()
-
-from keras.models import Sequential, Model
-from keras.layers import Conv2D, Conv2DTranspose, Activation, Dense, Flatten, Dropout, Input, BatchNormalization, UpSampling2D, Reshape, AveragePooling2D
-from keras.layers.advanced_activations import LeakyReLU
-from keras.optimizers import Adam, RMSprop
+import torch
+from torch import nn, optim, tensor
 
 import matplotlib.pyplot as plt
 
@@ -17,6 +12,74 @@ import midiwrite
 import song
 
 datasetino = []
+
+
+class Discriminator(nn.Module):
+  def __init__(self, n_filters=[1,4,8,16,32], filter_sizes=[13,9,5,3,3]):
+    super(Discriminator, self).__init__()
+    self.convs = []
+    self.dropouts = []
+    self.convs.append(nn.Conv2d(n_filters[0], n_filters[1], filter_sizes[0], stride=1, padding=6))
+    for i in range(1, len(n_filters)-1):
+      f = filter_sizes[i]
+      self.convs.append(nn.Conv2d(n_filters[i], n_filters[i+1], f, stride=1, padding=int(f/2)))
+      self.dropouts.append(nn.Dropout(0.8))
+
+    self.fc1 = nn.Linear(88*64*16, 64)
+    self.fc2 = nn.Linear(64, 1)
+
+
+  def forward(self, x):
+    for i in range(len(self.dropouts)):
+      x = self.convs[i](x)
+      x = self.dropouts[i](x)
+      x = nn.LeakyReLU(0.2)(x)
+
+    x = x.reshape(-1, 16*88*64)
+
+    x = self.fc1(x)
+    x = nn.Sigmoid()(x)
+    x = self.fc2(x)
+    x = nn.Sigmoid()(x)
+
+    return x
+
+
+class Generator(nn.Module):
+  def __init__(self):
+    super(Generator, self).__init__()
+    self.dropout = nn.Dropout(0.5)
+    self.fc1 = nn.Linear(10, 22*32*16)#10 = input_size
+    #self.upsample = nn.Upsample((88, 64, 32))
+    self.upsample = nn.Upsample(scale_factor=4)
+    self.bn1 = nn.BatchNorm1d(22*32*16)#10 = input_size
+
+    self.convs = []
+    self.convs.append(nn.Conv2d(32, 16, 13, stride=1, padding=6))
+    self.convs.append(nn.Conv2d(16, 8, 7, stride=1, padding=3))
+    self.convs.append(nn.Conv2d(8, 4, 5, stride=1, padding=2))
+    self.convs.append(nn.Conv2d(4, 1, 3, stride=1, padding=1))
+
+    self.bns = []
+    self.bns.append(nn.BatchNorm2d(32))
+    self.bns.append(nn.BatchNorm2d(16))
+    self.bns.append(nn.BatchNorm2d(8))
+    self.bns.append(nn.BatchNorm2d(4))
+
+  def forward(self, x):
+    x = self.dropout(x)
+    x = nn.LeakyReLU(0.2)(self.fc1(x))
+    x = self.bn1(x)
+
+    x = torch.reshape(x, (-1, 32, 22, 16))
+    x = self.upsample(x)
+
+    for i in range(len(self.convs)):
+      #x = self.bns[i](x)
+      x = self.convs[i](x)
+      x = nn.LeakyReLU(0.2)(x)
+
+    return nn.ReLU()(torch.sign(x))#Poor man's step function
 
 class GAN:
   def __init__(self):
@@ -34,27 +97,7 @@ class GAN:
     self.GAN = Model(inp, self.D(self.G(inp)))
     self.GAN.compile(loss="binary_crossentropy", optimizer=Adam(0.001))
 
-  def plot_gen(self, n_ex=16, dim=(4,4), figsize=(10,10)):
-    noise = self.noise(1, self.input_shape)
-    generated_images = self.G.predict(noise)
-
-    plt.figure(figsize=figsize)
-    for i in range(generated_images.shape[0]):
-        plt.subplot(dim[0],dim[1],i+1)
-        img = generated_images[i,0,:,:]
-        plt.imshow(img)
-        plt.axis('off')
-    plt.tight_layout()
-    plt.show(block=False)
-
-  def print_greyscale(self, pixels, width=64, height=88):
-    pixels = pixels.reshape(88, 64)
-    for row in pixels:
-      for pixel in row:
-        color = 232 + round(pixel*23)
-        print('\x1b[48;5;{}m \x1b[0m'.format(int(color)), end="")
-      print()
-
+  
   def train(self, dataset, batch_size, epochs=1):
     print(dataset.shape)
     dataset_length = dataset.shape[0]
@@ -161,7 +204,7 @@ class GAN:
   
   def create_discriminator(self, filter_sizes, n_filters, dropout=0.6):
     model = Sequential()
-    model.add(Conv2D(n_filters[0], filter_sizes[0], input_shape=(88, 64, 1), padding='same'))
+    model.add(Conv2d(n_filters[0], filter_sizes[0], input_shape=(88, 64, 1), padding='same'))
     #model.add(AveragePooling2D(pool_size=(2, 2)))#TODO Remove?
     model.add(Dropout(dropout))
     model.add(LeakyReLU(0.2))
@@ -216,3 +259,101 @@ class GAN:
   def noise(self, n, shape):
     return np.random.normal(0.0, 1.0, (n,) + shape[1:])
 
+
+def plot_gen(self, n_ex=16, dim=(4,4), figsize=(10,10)):
+    noise = self.noise(1, self.input_shape)
+    generated_images = self.G.predict(noise)
+
+    plt.figure(figsize=figsize)
+    for i in range(generated_images.shape[0]):
+        plt.subplot(dim[0],dim[1],i+1)
+        img = generated_images[i,0,:,:]
+        plt.imshow(img)
+        plt.axis('off')
+    plt.tight_layout()
+    plt.show(block=False)
+
+def print_grayscale(pixels, width=64, height=88):
+  pixels = np.transpose(pixels.reshape(88, 64))
+  for row in pixels:
+    for pixel in row:
+      color = 232 + round(pixel*23)
+      print('\x1b[48;5;{}m \x1b[0m'.format(int(color)), end="")
+    print()
+
+def train(data):
+  loss = nn.BCELoss()
+  d = Discriminator()
+  d_opt = optim.Adam(d.parameters(), lr=0.001)
+  g = Generator()
+  g_opt = optim.Adam(g.parameters(), lr=0.001)
+
+  batch_size = 32
+  data_size = data.shape[0]
+  data = np.transpose(data, (0, 3, 1, 2))
+
+  #Pretraining discriminator
+  for i in range(10):
+    noise = torch.rand(32, 10)
+    fake_data = g(noise)
+    real_data = torch.Tensor(data[0:32])
+
+    real_outp = d(real_data)
+    fake_outp = d(fake_data.detach())
+
+    d_opt.zero_grad()
+    fake_loss = loss(real_outp, torch.zeros(32))
+    real_loss = loss(fake_outp, torch.ones(32))
+    d_loss = (real_loss + fake_loss) / 2
+
+    d_loss.backward()
+    d_opt.step()
+
+    print(d_loss)
+
+  #Real training
+  for ep in range(50):
+    for i in range(0, data_size-batch_size, batch_size):
+      noise = torch.rand(batch_size, 10)
+      fake_data = g(noise)
+      real_data = torch.Tensor(data[i:i+batch_size])
+
+      g_opt.zero_grad()
+      g_loss = loss(d(fake_data), torch.zeros(batch_size))
+      g_loss.backward()
+      g_opt.step()
+
+      real_outp = d(real_data)
+      fake_outp = d(fake_data.detach())
+
+      d_opt.zero_grad()
+      fake_loss = loss(real_outp, torch.zeros(batch_size))
+      real_loss = loss(fake_outp, torch.ones(batch_size))
+      d_loss = (real_loss + fake_loss) / 2
+
+      d_loss.backward()
+      d_opt.step()
+
+      if i % (batch_size*20) == 0:
+        print('---LOSSES---')
+        print(d_loss)
+        print(g_loss)
+
+      if i % (batch_size*200) == 0:
+        print_grayscale(fake_data.detach().numpy()[0])
+
+    print('---LOSSES---')
+    print(d_loss)
+    print(g_loss)
+    if ep % 20 == 0:
+      print_grayscale(fake_data.detach().numpy()[0])
+      pass
+
+
+
+
+  #print_grayscale(y.detach().numpy()[0])
+  #print_grayscale(data[0])
+
+if __name__ == '__main__':
+  train()
